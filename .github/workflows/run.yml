@@ -1,0 +1,114 @@
+name: run
+
+on:
+  workflow_dispatch:
+    inputs:
+      p0:
+        type: choice
+        options:
+          - release
+          - main
+        default: release
+
+permissions:
+  contents: read
+
+concurrency:
+  group: run
+  cancel-in-progress: false
+
+jobs:
+  a:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      B3: ${{ secrets.B3 }}
+      K0: ${{ secrets.K0 }}
+      K1: ${{ secrets.K1 }}
+      K2: ${{ secrets.K2 }}
+      K3: ${{ secrets.K3 }}
+      K4: ${{ secrets.K4 }}
+      K5: ${{ secrets.K5 }}
+      K6: ${{ secrets.K6 }}
+      K7: ${{ secrets.K7 }}
+      K8: ${{ secrets.K8 }}
+      K9: ${{ secrets.K9 }}
+      K10: ${{ secrets.K10 }}
+      P0: ${{ inputs.p0 }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          rm -rf "$RUNNER_TEMP/k"
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-a.sh
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: x
+          path: ${{ runner.temp }}/o/x.bin
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e-a
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
+
+  b:
+    needs: a
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      B3: ${{ secrets.B3 }}
+      P0: ${{ inputs.p0 }}
+    steps:
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          rm -rf "$RUNNER_TEMP/k"
+      - uses: actions/download-artifact@v4
+        with:
+          name: x
+          path: ${{ runner.temp }}/i
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-b.sh
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: y
+          path: ${{ runner.temp }}/o/y.bin
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e-b
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
