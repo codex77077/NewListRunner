@@ -34,9 +34,10 @@ jobs:
       K8: ${{ secrets.K8 }}
       K9: ${{ secrets.K9 }}
       K10: ${{ secrets.K10 }}
+      K11: ${{ secrets.K11 }}
       P0: ${{ inputs.p0 }}
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
       - name: prepare
@@ -55,14 +56,14 @@ jobs:
           rm -rf "$RUNNER_TEMP/k"
       - name: execute
         run: cd "$RUNNER_TEMP/p" && ./run-a.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: success()
         with:
           name: x
           path: ${{ runner.temp }}/o/x.bin
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: e-a
@@ -92,20 +93,20 @@ jobs:
           git clone --quiet "$P1" "$RUNNER_TEMP/p"
           git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
           rm -rf "$RUNNER_TEMP/k"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: x
           path: ${{ runner.temp }}/i
       - name: execute
         run: cd "$RUNNER_TEMP/p" && ./run-b.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: success()
         with:
           name: y
           path: ${{ runner.temp }}/o/y.bin
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: e-b
