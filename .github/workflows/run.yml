@@ -9,8 +9,12 @@ on:
           - release
           - main
         default: release
+      p4:
+        type: string
+        required: false
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -19,6 +23,7 @@ concurrency:
 
 jobs:
   a:
+    if: inputs.p4 == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -73,6 +78,7 @@ jobs:
 
   b:
     needs: a
+    if: inputs.p4 == ''
     runs-on: macos-15
     timeout-minutes: 90
     env:
@@ -110,6 +116,137 @@ jobs:
         if: failure()
         with:
           name: e-b
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
+
+  c:
+    needs: [a, b]
+    if: always() && (needs.b.result == 'success' || inputs.p4 != '')
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      B3: ${{ secrets.B3 }}
+      P0: ${{ inputs.p0 }}
+      Q0: ${{ secrets.Q0 }}
+      Q1: ${{ secrets.Q1 }}
+      A0: ${{ secrets.A0 }}
+      A1: ${{ secrets.A1 }}
+      A2: ${{ secrets.A2 }}
+      A3: ${{ secrets.A3 }}
+      A4: ${{ secrets.A4 }}
+      A5: ${{ secrets.A5 }}
+      A6: ${{ secrets.A6 }}
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          rm -rf "$RUNNER_TEMP/k"
+      - uses: actions/download-artifact@v8
+        if: inputs.p4 == ''
+        with:
+          name: y
+          path: ${{ runner.temp }}/i
+      - uses: actions/download-artifact@v8
+        if: inputs.p4 != ''
+        with:
+          name: y
+          path: ${{ runner.temp }}/i
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.p4 }}
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-c.sh
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: c
+          path: ${{ runner.temp }}/o/c.bin
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e-c
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
+
+  d:
+    needs: [a, b]
+    if: always() && (needs.b.result == 'success' || inputs.p4 != '')
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      B3: ${{ secrets.B3 }}
+      P0: ${{ inputs.p0 }}
+      Q2: ${{ secrets.Q2 }}
+      Q3: ${{ secrets.Q3 }}
+      A0: ${{ secrets.A0 }}
+      A1: ${{ secrets.A1 }}
+      A2: ${{ secrets.A2 }}
+      A3: ${{ secrets.A3 }}
+      A4: ${{ secrets.A4 }}
+      A7: ${{ secrets.A7 }}
+      A8: ${{ secrets.A8 }}
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          rm -rf "$RUNNER_TEMP/k"
+      - uses: actions/download-artifact@v8
+        if: inputs.p4 == ''
+        with:
+          name: y
+          path: ${{ runner.temp }}/i
+      - uses: actions/download-artifact@v8
+        if: inputs.p4 != ''
+        with:
+          name: y
+          path: ${{ runner.temp }}/i
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.p4 }}
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-d.sh
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: d
+          path: ${{ runner.temp }}/o/d.bin
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e-d
           path: ${{ runner.temp }}/o/e.bin
           retention-days: 1
           if-no-files-found: ignore
