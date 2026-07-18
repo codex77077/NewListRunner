@@ -9,12 +9,16 @@ on:
           - release
           - main
         default: release
+      p1:
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: run
+  group: run-${{ inputs.p0 }}
   cancel-in-progress: false
 
 jobs:
@@ -36,6 +40,9 @@ jobs:
       K10: ${{ secrets.K10 }}
       K11: ${{ secrets.K11 }}
       P0: ${{ inputs.p0 }}
+      R0: ${{ inputs.p1 }}
+      W0: ${{ secrets.W0 }}
+      W1: ${{ secrets.W1 }}
     steps:
       - uses: actions/setup-node@v7
         with:
@@ -233,6 +240,56 @@ jobs:
         if: failure()
         with:
           name: e-d
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
+
+  e:
+    needs:
+      - a
+      - b
+      - c
+      - d
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      B3: ${{ secrets.B3 }}
+      P0: ${{ inputs.p0 }}
+      R0: ${{ inputs.p1 }}
+      R1: ${{ needs.a.result == 'success' && needs.b.result == 'success' && needs.c.result == 'success' && needs.d.result == 'success' && 'success' || 'failure' }}
+      W0: ${{ secrets.W0 }}
+      W1: ${{ secrets.W1 }}
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+          cache: false
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          find "$RUNNER_TEMP/k" -depth -delete
+      - uses: actions/download-artifact@v8
+        if: env.R1 == 'success'
+        with:
+          name: y
+          path: ${{ runner.temp }}/i
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-e.sh
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e-e
           path: ${{ runner.temp }}/o/e.bin
           retention-days: 1
           if-no-files-found: ignore
