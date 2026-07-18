@@ -1,0 +1,39 @@
+name: q
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  q:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      A0: ${{ secrets.A0 }}
+      A1: ${{ secrets.A1 }}
+      A2: ${{ secrets.A2 }}
+      A7: ${{ secrets.A7 }}
+    steps:
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          rm -rf "$RUNNER_TEMP/k"
+      - name: execute
+        env:
+          ASC_ISSUER_ID: ${{ env.A0 }}
+          ASC_KEY_ID: ${{ env.A1 }}
+          ASC_PRIVATE_KEY: ${{ env.A2 }}
+          ASC_APP_ID: ${{ env.A7 }}
+        run: cd "$RUNNER_TEMP/p" && ./run-q.sh
