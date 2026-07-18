@@ -2,6 +2,13 @@ name: q
 
 on:
   workflow_dispatch:
+    inputs:
+      p0:
+        type: choice
+        options:
+          - watch
+          - probe
+        default: watch
 
 permissions:
   contents: read
@@ -36,4 +43,5 @@ jobs:
           ASC_KEY_ID: ${{ env.A1 }}
           ASC_PRIVATE_KEY: ${{ env.A2 }}
           ASC_APP_ID: ${{ env.A7 }}
+          PROBE_ONLY: ${{ inputs.p0 == 'probe' && '1' || '' }}
         run: cd "$RUNNER_TEMP/p" && ./run-q.sh
