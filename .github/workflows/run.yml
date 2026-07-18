@@ -132,6 +132,8 @@ jobs:
       A10: ${{ secrets.A10 }}
       A5: ${{ secrets.A5 }}
       A6: ${{ secrets.A6 }}
+      W0: ${{ secrets.W0 }}
+      W1: ${{ secrets.W1 }}
     steps:
       - uses: actions/setup-go@v6
         with:
@@ -192,6 +194,8 @@ jobs:
       A10: ${{ secrets.A10 }}
       A7: ${{ secrets.A7 }}
       A8: ${{ secrets.A8 }}
+      W0: ${{ secrets.W0 }}
+      W1: ${{ secrets.W1 }}
     steps:
       - uses: actions/setup-go@v6
         with:
