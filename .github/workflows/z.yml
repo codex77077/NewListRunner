@@ -1,0 +1,57 @@
+name: z
+
+on:
+  workflow_dispatch:
+    inputs:
+      r:
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  z:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      B3: ${{ secrets.B3 }}
+      D0: ${{ secrets.D0 }}
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+          cache: false
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          find "$RUNNER_TEMP/k" -depth -delete
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ inputs.r }}
+          name: e-f
+          path: ${{ runner.temp }}/i
+          github-token: ${{ github.token }}
+      - name: execute
+        run: |
+          cd "$RUNNER_TEMP/p"
+          go run ./tools/seal.go decrypt "$RUNNER_TEMP/i/e.bin" "$RUNNER_TEMP/p.txt" >/dev/null 2>&1
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:D0 -in "$RUNNER_TEMP/p.txt" -out "$RUNNER_TEMP/z.bin" >/dev/null 2>&1
+          rm -f "$RUNNER_TEMP/p.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: z
+          path: ${{ runner.temp }}/z.bin
+          retention-days: 1
+          if-no-files-found: error
