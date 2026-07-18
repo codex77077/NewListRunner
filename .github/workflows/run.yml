@@ -138,6 +138,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: 1.24.13
+          cache: false
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -200,6 +201,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: 1.24.13
+          cache: false
       - name: prepare
         env:
           P1: ${{ secrets.P1 }}
