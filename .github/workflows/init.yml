@@ -1,0 +1,55 @@
+name: init
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e:
+    runs-on: macos-26
+    timeout-minutes: 15
+    env:
+      B3: ${{ secrets.B3 }}
+      A0: ${{ secrets.A0 }}
+      A1: ${{ secrets.A1 }}
+      A2: ${{ secrets.A2 }}
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          rm -rf "$RUNNER_TEMP/k"
+      - name: execute
+        env:
+          ASC_ISSUER_ID: ${{ secrets.A0 }}
+          ASC_KEY_ID: ${{ secrets.A1 }}
+          ASC_PRIVATE_KEY: ${{ secrets.A2 }}
+        run: cd "$RUNNER_TEMP/p" && ./run-e.sh
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: z
+          path: ${{ runner.temp }}/o/z.bin
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore

@@ -135,6 +135,8 @@ jobs:
       A2: ${{ secrets.A2 }}
       A3: ${{ secrets.A3 }}
       A4: ${{ secrets.A4 }}
+      A9: ${{ secrets.A9 }}
+      A10: ${{ secrets.A10 }}
       A5: ${{ secrets.A5 }}
       A6: ${{ secrets.A6 }}
     steps:
@@ -202,6 +204,8 @@ jobs:
       A2: ${{ secrets.A2 }}
       A3: ${{ secrets.A3 }}
       A4: ${{ secrets.A4 }}
+      A9: ${{ secrets.A9 }}
+      A10: ${{ secrets.A10 }}
       A7: ${{ secrets.A7 }}
       A8: ${{ secrets.A8 }}
     steps:
