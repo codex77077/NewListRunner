@@ -170,13 +170,6 @@ jobs:
       - name: execute
         run: cd "$RUNNER_TEMP/p" && ./run-c.sh
       - uses: actions/upload-artifact@v7
-        if: success()
-        with:
-          name: c
-          path: ${{ runner.temp }}/o/c.bin
-          retention-days: 1
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e-c
@@ -229,13 +222,6 @@ jobs:
           path: ${{ runner.temp }}/i
       - name: execute
         run: cd "$RUNNER_TEMP/p" && ./run-d.sh
-      - uses: actions/upload-artifact@v7
-        if: success()
-        with:
-          name: d
-          path: ${{ runner.temp }}/o/d.bin
-          retention-days: 1
-          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -290,6 +276,49 @@ jobs:
         if: failure()
         with:
           name: e-e
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
+
+  g:
+    needs:
+      - b
+      - e
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    env:
+      B3: ${{ secrets.B3 }}
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+          cache: false
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          find "$RUNNER_TEMP/k" -depth -delete
+      - name: execute
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: cd "$RUNNER_TEMP/p" && ./run-g.sh
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e-g
           path: ${{ runner.temp }}/o/e.bin
           retention-days: 1
           if-no-files-found: ignore

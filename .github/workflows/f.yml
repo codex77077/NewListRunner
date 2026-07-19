@@ -57,13 +57,6 @@ jobs:
       - name: execute
         run: cd "$RUNNER_TEMP/p" && ./run-f.sh
       - uses: actions/upload-artifact@v7
-        if: success()
-        with:
-          name: f
-          path: ${{ runner.temp }}/o/f.bin
-          retention-days: 1
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e-f
@@ -79,38 +72,35 @@ jobs:
     env:
       E0: ${{ inputs.e }}
       T0: ${{ inputs.a }}
-      R0: ${{ needs.f.result }}
+      R0: ${{ needs.f.result == 'success' && 'success' || 'failure' }}
+      B3: ${{ secrets.B3 }}
       W0: ${{ secrets.W0 }}
       W1: ${{ secrets.W1 }}
     steps:
-      - name: report
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+          cache: false
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
         run: |
-          install -m 700 -d "$RUNNER_TEMP/r"
-          timestamp="$(date +%s)"
-          export timestamp
-          python3 - <<'PY'
-          import hashlib
-          import hmac
-          import json
-          import os
-          from pathlib import Path
-
-          body = json.dumps({
-              "eventId": os.environ["E0"],
-              "attempt": int(os.environ["T0"]),
-              "result": "success" if os.environ["R0"] == "success" else "failure",
-          }, separators=(",", ":")).encode()
-          Path(os.environ["RUNNER_TEMP"], "r", "body.json").write_bytes(body)
-          signed = os.environ["timestamp"].encode() + b"." + body
-          signature = hmac.new(os.environ["W1"].encode(), signed, hashlib.sha256).hexdigest()
-          Path(os.environ["RUNNER_TEMP"], "r", "signature").write_text(signature)
-          PY
-          signature="$(cat "$RUNNER_TEMP/r/signature")"
-          curl --silent --show-error --fail-with-body --retry 3 --retry-all-errors \
-            -X POST "${W0%/}/v1/ci/finalizer-result" \
-            -H 'Content-Type: application/json' \
-            -H "x-ci-timestamp: $timestamp" \
-            -H "x-ci-signature: hmacsha256=$signature" \
-            --data-binary "@$RUNNER_TEMP/r/body.json" \
-            --output /dev/null
-          find "$RUNNER_TEMP/r" -depth -delete
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          find "$RUNNER_TEMP/k" -depth -delete
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-r.sh
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e-r
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
