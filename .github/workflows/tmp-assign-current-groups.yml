@@ -1,0 +1,90 @@
+name: tmp-assign-current-groups
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      A0: ${{ secrets.A0 }}
+      A1: ${{ secrets.A1 }}
+      A2: ${{ secrets.A2 }}
+      A5: ${{ secrets.A5 }}
+      A7: ${{ secrets.A7 }}
+      P1: ${{ secrets.P1 }}
+      P2: ${{ secrets.P2 }}
+      P3: ${{ secrets.P3 }}
+    steps:
+      - name: prepare
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/id"
+          chmod 600 "$RUNNER_TEMP/k/id"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/known_hosts" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/known_hosts"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          printf '%s' "$A2" > "$RUNNER_TEMP/k/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/k/AuthKey.p8"
+          find "$RUNNER_TEMP/k" -type f ! -name AuthKey.p8 -delete
+      - name: assign current builds
+        run: |
+          set -euo pipefail
+          export ASC_ISSUER_ID="$A0"
+          export ASC_KEY_ID="$A1"
+          export ASC_PRIVATE_KEY_PATH="$RUNNER_TEMP/k/AuthKey.p8"
+          ruby -I"$RUNNER_TEMP/p/tools" -rasc -rjson - <<'RUBY'
+          client = AscClient.new
+          targets = {
+            "IOS" => { "version" => "888.888", "group_id" => "1a79324c-ca2c-4460-b819-329a38190260" },
+            "TV_OS" => { "version" => "666.666", "group_id" => "1a79324c-ca2c-4460-b819-329a38190260" },
+            "MAC_OS" => { "version" => "777.777", "group_id" => "86d83b3a-e674-4eda-9960-131e1b758d01" }
+          }
+          latest = {}
+          [ENV.fetch("A5"), ENV.fetch("A7")].uniq.each do |app_id|
+            path = client.query("/v1/builds", { "filter[app]" => app_id, "sort" => "-uploadedDate", "limit" => "200" })
+            client.list(path).each do |build|
+              next unless build.dig("attributes", "processingState") == "VALID"
+
+              pre_release = client.get("/v1/builds/#{build.fetch("id")}/preReleaseVersion").fetch("data")
+              platform = pre_release.dig("attributes", "platform")
+              target = targets[platform]
+              next unless target && pre_release.dig("attributes", "version") == target["version"]
+
+              uploaded = build.dig("attributes", "uploadedDate").to_s
+              current = latest[platform]
+              latest[platform] = {
+                "build_id" => build.fetch("id"),
+                "version" => target["version"],
+                "uploaded_date" => uploaded,
+                "group_id" => target["group_id"]
+              } if current.nil? || uploaded > current["uploaded_date"]
+            end
+          end
+
+          missing = targets.keys - latest.keys
+          abort "missing current valid builds: #{missing.join(",")}" unless missing.empty?
+
+          result = targets.keys.map do |platform|
+            selected = latest.fetch(platform)
+            group_id = selected.fetch("group_id")
+            existing = client.list("/v1/betaGroups/#{group_id}/builds?limit=200")
+            already_assigned = existing.any? { |build| build.fetch("id") == selected.fetch("build_id") }
+            client.post("/v1/betaGroups/#{group_id}/relationships/builds", {
+              "data" => [{ "type" => "builds", "id" => selected.fetch("build_id") }]
+            }, [204]) unless already_assigned
+            selected.merge("platform" => platform, "status" => already_assigned ? "already_assigned" : "assigned")
+          end
+
+          puts JSON.pretty_generate(result)
+          RUBY
+      - name: cleanup
+        if: always()
+        run: |
+          find "$RUNNER_TEMP/k" "$RUNNER_TEMP/p" -depth -delete 2>/dev/null || true
