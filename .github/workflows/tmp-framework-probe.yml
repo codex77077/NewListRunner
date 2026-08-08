@@ -1,0 +1,72 @@
+name: tmp-framework-probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "产出 y framework artifact 的 run ID"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      B3: ${{ secrets.B3 }}
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+          cache: false
+
+      - name: 拉取固定 payload
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$RUNNER_TEMP/k"
+          printf '%s\n' "$P2" > "$RUNNER_TEMP/k/i"
+          chmod 600 "$RUNNER_TEMP/k/i"
+          ssh-keyscan github.com > "$RUNNER_TEMP/k/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/k/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/k/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+          find "$RUNNER_TEMP/k" -depth -delete
+
+      - name: 下载并解密 framework
+        uses: actions/download-artifact@v8
+        with:
+          name: y
+          path: ${{ runner.temp }}/framework-input
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: 校验 framework 内容
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/p"
+          probe="$RUNNER_TEMP/framework-probe"
+          install -m 700 -d "$probe/unpacked"
+          test -s "$RUNNER_TEMP/framework-input/y.bin"
+          go run "$payload/tools/seal.go" decrypt \
+            "$RUNNER_TEMP/framework-input/y.bin" "$probe/framework.tar.gz" >/dev/null
+          tar -tzf "$probe/framework.tar.gz" >/dev/null
+          tar -C "$probe/unpacked" -xzf "$probe/framework.tar.gz"
+          test -d "$probe/unpacked/MergedLib.xcframework"
+          test -s "$probe/unpacked/manifest.json"
+          file_count="$(find "$probe/unpacked/MergedLib.xcframework" -type f | wc -l | tr -d ' ')"
+          test "$file_count" -gt 0
+          printf 'framework probe passed: %s files\n' "$file_count"
+
+      - name: 清理临时文件
+        if: always()
+        run: |
+          find "$RUNNER_TEMP/k" "$RUNNER_TEMP/p" "$RUNNER_TEMP/framework-input" "$RUNNER_TEMP/framework-probe" -depth -delete 2>/dev/null || true
