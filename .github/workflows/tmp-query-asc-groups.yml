@@ -42,9 +42,9 @@ jobs:
           ruby -I"$RUNNER_TEMP/p/tools" -rasc -rjson - <<'RUBY'
           client = AscClient.new
           targets = %w[macos openlist@beta]
-          app_ids = [ENV.fetch("A5"), ENV.fetch("A7")].uniq
+          app_ids = { "A5" => ENV.fetch("A5"), "A7" => ENV.fetch("A7") }
           matches = []
-          app_ids.each do |app_id|
+          app_ids.each do |app_label, app_id|
             path = client.query("/v1/betaGroups", { "filter[app]" => app_id, "limit" => "200" })
             client.list(path).each do |group|
               name = group.dig("attributes", "name").to_s
@@ -52,7 +52,7 @@ jobs:
 
               matches << {
                 "name" => name,
-                "app_id" => app_id,
+                "app_label" => app_label,
                 "group_id" => group.fetch("id"),
                 "is_internal_group" => group.dig("attributes", "isInternalGroup")
               }
