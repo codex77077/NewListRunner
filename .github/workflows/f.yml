@@ -34,6 +34,7 @@ jobs:
       A7: ${{ secrets.A7 }}
       A8: ${{ secrets.A8 }}
       A12: ${{ secrets.A12 }}
+      A13: ${{ secrets.A13 }}
       W0: ${{ secrets.W0 }}
       W1: ${{ secrets.W1 }}
     steps:
