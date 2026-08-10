@@ -13,6 +13,11 @@ on:
         type: string
         required: false
         default: ""
+      assign_testflight_groups:
+        description: 将 main 构建加入已配置的 TestFlight 分组
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: read
@@ -141,6 +146,7 @@ jobs:
       A6: ${{ secrets.A6 }}
       W0: ${{ secrets.W0 }}
       W1: ${{ secrets.W1 }}
+      T1: ${{ inputs.assign_testflight_groups }}
     steps:
       - uses: actions/setup-go@v6
         with:
@@ -197,6 +203,7 @@ jobs:
       A8: ${{ secrets.A8 }}
       W0: ${{ secrets.W0 }}
       W1: ${{ secrets.W1 }}
+      T1: ${{ inputs.assign_testflight_groups }}
     steps:
       - uses: actions/setup-go@v6
         with:
@@ -251,6 +258,7 @@ jobs:
       A11: ${{ secrets.A11 }}
       W0: ${{ secrets.W0 }}
       W1: ${{ secrets.W1 }}
+      T1: ${{ inputs.assign_testflight_groups }}
     steps:
       - uses: actions/setup-go@v6
         with:
