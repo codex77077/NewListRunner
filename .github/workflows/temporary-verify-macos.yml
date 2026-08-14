@@ -61,6 +61,7 @@ jobs:
           name: y
           path: ${{ runner.temp }}/i
           github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
           run-id: ${{ inputs.source_run_id }}
       - name: execute
         run: cd "$RUNNER_TEMP/p" && ./run-m.sh
