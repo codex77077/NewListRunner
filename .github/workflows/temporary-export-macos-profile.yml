@@ -1,0 +1,58 @@
+name: temporary-export-macos-profile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ASC_ISSUER_ID: ${{ secrets.A0 }}
+      ASC_KEY_ID: ${{ secrets.A1 }}
+      ASC_PRIVATE_KEY: ${{ secrets.A2 }}
+      APPLE_DISTRIBUTION_P12_BASE64: ${{ secrets.A3 }}
+      APPLE_DISTRIBUTION_P12_PASSWORD: ${{ secrets.A4 }}
+      B3: ${{ secrets.B3 }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fac61fcaf21e2d422f9ed7b45e2047ca3cb134dc
+      - name: 创建并安全导出 Base64 profile
+        run: |
+          ruby .github/scripts/temporary-create-macos-profile.rb "$RUNNER_TEMP/raw.bin"
+          ruby -rbase64 -ropenssl -e '
+            magic = "S1\x00\x01".b
+            key = Base64.strict_decode64(ENV.fetch("B3"))
+            raw = File.binread(ARGV.fetch(0))
+            abort "invalid sealed profile" unless raw.start_with?(magic) && raw.bytesize > 32
+            nonce = raw.byteslice(4, 12)
+            ciphertext = raw.byteslice(16, raw.bytesize - 32)
+            tag = raw.byteslice(-16, 16)
+            decryptor = OpenSSL::Cipher.new("aes-256-gcm")
+            decryptor.decrypt
+            decryptor.key = key
+            decryptor.iv = nonce
+            decryptor.auth_tag = tag
+            decryptor.auth_data = magic
+            profile = decryptor.update(ciphertext) + decryptor.final
+            encoded_profile = Base64.strict_encode64(profile)
+            encryptor = OpenSSL::Cipher.new("aes-256-gcm")
+            encryptor.encrypt
+            encryptor.key = key
+            output_nonce = OpenSSL::Random.random_bytes(12)
+            encryptor.iv = output_nonce
+            encryptor.auth_data = magic
+            encrypted = encryptor.update(encoded_profile) + encryptor.final
+            File.binwrite(ARGV.fetch(1), magic + output_nonce + encrypted + encryptor.auth_tag, mode: "w", perm: 0o600)
+            File.delete(ARGV.fetch(0))
+          ' "$RUNNER_TEMP/raw.bin" "$RUNNER_TEMP/a11-base64.bin"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: temporary-a11-base64
+          path: ${{ runner.temp }}/a11-base64.bin
+          retention-days: 1
+          if-no-files-found: error
