@@ -256,6 +256,8 @@ jobs:
       A7: ${{ secrets.A7 }}
       A8: ${{ secrets.A8 }}
       A11: ${{ secrets.A11 }}
+      A14: ${{ secrets.A14 }}
+      A15: ${{ secrets.A15 }}
       W0: ${{ secrets.W0 }}
       W1: ${{ secrets.W1 }}
       T1: ${{ inputs.assign_testflight_groups }}

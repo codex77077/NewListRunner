@@ -1,0 +1,27 @@
+name: temporary-create-mac-installer-certificate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ASC_ISSUER_ID: ${{ secrets.A0 }}
+      ASC_KEY_ID: ${{ secrets.A1 }}
+      ASC_PRIVATE_KEY: ${{ secrets.A2 }}
+      B3: ${{ secrets.B3 }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: 创建固定 Mac Installer Distribution 身份
+        run: ruby .github/scripts/temporary-create-mac-installer-certificate.rb "$RUNNER_TEMP/installer.bin"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: temporary-mac-installer-identity
+          path: ${{ runner.temp }}/installer.bin
+          retention-days: 1
+          if-no-files-found: error
