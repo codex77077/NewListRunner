@@ -121,14 +121,13 @@ candidates = before.filter_map do |item|
   { item: item, certificate: certificate, type: type }
 end
 
-abort "候选证书超过 5 个，超出预期，拒绝批量撤销" if candidates.length > 5
-
 puts "当前有效证书：#{before.length}；预置 P12 保护证书：#{protected_fingerprints.length}；待撤销近期开发证书：#{candidates.length}"
 candidates.each_with_index do |candidate, index|
   certificate = candidate.fetch(:certificate)
   serial_suffix = certificate.serial.to_s(16).upcase[-8, 8]
   puts "候选 #{index + 1}：类型=#{candidate.fetch(:type)}，生效=#{certificate.not_before.utc.iso8601}，到期=#{certificate.not_after.utc.iso8601}，序列尾号=#{serial_suffix}"
 end
+abort "候选证书超过 20 个，超出预期，拒绝批量撤销" if candidates.length > 20
 
 candidates.each do |candidate|
   request.call("DELETE", "/v1/certificates/#{candidate.fetch(:item).fetch("id")}", [204])
