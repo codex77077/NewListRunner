@@ -4,7 +4,9 @@
 require "base64"
 require "json"
 require "net/http"
+require "open3"
 require "openssl"
+require "tempfile"
 require "time"
 require "uri"
 
@@ -26,11 +28,28 @@ key_id = required_env("ASC_KEY_ID")
 private_key = OpenSSL::PKey.read(required_env("ASC_PRIVATE_KEY"))
 cutoff = Time.parse(required_env("CERTIFICATE_CUTOFF"))
 
-p12 = OpenSSL::PKCS12.new(
-  Base64.strict_decode64(required_env("APPLE_DISTRIBUTION_P12_BASE64").gsub(/\s+/, "")),
-  required_env("APPLE_DISTRIBUTION_P12_PASSWORD")
-)
-protected_fingerprints = ([p12.certificate] + Array(p12.ca_certs)).compact.to_h do |certificate|
+certificates = Tempfile.create(["protected-signing", ".p12"]) do |p12_file|
+  p12_file.binmode
+  p12_file.chmod(0o600)
+  p12_file.write(Base64.strict_decode64(required_env("APPLE_DISTRIBUTION_P12_BASE64").gsub(/\s+/, "")))
+  p12_file.flush
+
+  Tempfile.create(["protected-certificates", ".pem"]) do |certificate_file|
+    certificate_file.chmod(0o600)
+    _stdout, _stderr, status = Open3.capture3(
+      { "P12_PASS" => required_env("APPLE_DISTRIBUTION_P12_PASSWORD") },
+      "openssl", "pkcs12", "-legacy", "-in", p12_file.path, "-nokeys",
+      "-passin", "env:P12_PASS", "-out", certificate_file.path
+    )
+    abort "无法解析预置 P12，拒绝执行撤销" unless status.success?
+
+    certificate_file.rewind
+    certificate_file.read.scan(/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/m).map do |pem|
+      OpenSSL::X509::Certificate.new(pem)
+    end
+  end
+end
+protected_fingerprints = certificates.to_h do |certificate|
   [OpenSSL::Digest::SHA256.hexdigest(certificate.to_der), true]
 end
 abort "预置 P12 中未发现证书，拒绝执行撤销" if protected_fingerprints.empty?
