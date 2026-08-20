@@ -169,6 +169,29 @@ jobs:
           git clone --quiet "$P1" "$RUNNER_TEMP/p"
           git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
           rm -rf "$RUNNER_TEMP/k"
+      - name: prepare iOS app
+        id: ios-deps
+        env:
+          APP_REPO_URL: ${{ secrets.Q0 }}
+          APP_REPO_KEY: ${{ secrets.Q1 }}
+        run: cd "$RUNNER_TEMP/p" && ./scripts/prepare-ios-app.sh
+      - name: restore Yarn cache
+        id: yarn-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/Library/Caches/Yarn
+          key: ios-yarn-v1-${{ runner.os }}-${{ runner.arch }}-node20-yarn1.22.22-${{ steps.ios-deps.outputs.yarn_lock }}
+      - name: restore CocoaPods cache
+        id: pods-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ${{ runner.temp }}/app-ios/ios/Pods
+          key: ios-pods-v1-${{ runner.os }}-${{ runner.arch }}-cocoapods1.16.2-${{ steps.ios-deps.outputs.xcode }}-${{ steps.ios-deps.outputs.pod_lock }}
+      - name: report dependency caches
+        run: |
+          printf 'dependency cache hits: yarn=%s pods=%s\n' '${{ steps.yarn-cache.outputs.cache-hit }}' '${{ steps.pods-cache.outputs.cache-hit }}'
       - uses: actions/download-artifact@v8
         with:
           name: y
