@@ -18,6 +18,18 @@ on:
         type: boolean
         required: false
         default: true
+      p2:
+        type: choice
+        options:
+          - all
+          - c
+        default: all
+      p4:
+        type: choice
+        options:
+          - default
+          - sandbox
+        default: default
 
 permissions:
   contents: read
@@ -128,6 +140,7 @@ jobs:
 
   c:
     needs: b
+    if: inputs.p2 == 'all' || inputs.p2 == 'c'
     runs-on: macos-26
     timeout-minutes: 120
     env:
@@ -147,6 +160,7 @@ jobs:
       W0: ${{ secrets.W0 }}
       W1: ${{ secrets.W1 }}
       T1: ${{ inputs.assign_testflight_groups }}
+      T3: ${{ inputs.p4 }}
     steps:
       - uses: actions/setup-go@v6
         with:
@@ -208,6 +222,7 @@ jobs:
 
   d:
     needs: b
+    if: inputs.p2 == 'all'
     runs-on: macos-26
     timeout-minutes: 120
     env:
@@ -262,6 +277,7 @@ jobs:
 
   m:
     needs: b
+    if: inputs.p2 == 'all'
     runs-on: macos-26
     timeout-minutes: 120
     env:
@@ -324,7 +340,7 @@ jobs:
       - c
       - d
       - m
-    if: always()
+    if: always() && inputs.p2 == 'all'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
