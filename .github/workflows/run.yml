@@ -387,6 +387,9 @@ jobs:
   g:
     needs:
       - b
+      - c
+      - d
+      - m
       - e
     if: always()
     runs-on: ubuntu-24.04
