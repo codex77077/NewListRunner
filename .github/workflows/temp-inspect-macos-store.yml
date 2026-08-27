@@ -1,0 +1,58 @@
+name: temp-inspect-macos-store
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          key_dir="$RUNNER_TEMP/k"
+          cleanup_key() { find "$key_dir" -depth -delete 2>/dev/null || true; }
+          trap cleanup_key EXIT
+          install -m 700 -d "$key_dir"
+          printf '%s\n' "$P2" > "$key_dir/i"
+          chmod 600 "$key_dir/i"
+          ssh-keyscan github.com > "$key_dir/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $key_dir/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$key_dir/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+      - name: inspect macOS store versions
+        env:
+          ASC_ISSUER_ID: ${{ secrets.A0 }}
+          ASC_KEY_ID: ${{ secrets.A1 }}
+          ASC_PRIVATE_KEY: ${{ secrets.A2 }}
+          ASC_APP_ID: ${{ secrets.A5 }}
+        run: |
+          secret_dir="$RUNNER_TEMP/asc"
+          cleanup_secret() { find "$secret_dir" -depth -delete 2>/dev/null || true; }
+          trap cleanup_secret EXIT
+          install -m 700 -d "$secret_dir"
+          printf '%s' "$ASC_PRIVATE_KEY" > "$secret_dir/key.p8"
+          chmod 600 "$secret_dir/key.p8"
+          export ASC_PRIVATE_KEY_PATH="$secret_dir/key.p8"
+          ruby -I "$RUNNER_TEMP/p" -r tools/asc.rb -r json -e '
+            client = AscClient.new
+            path = client.query("/v1/apps/#{ENV.fetch("ASC_APP_ID")}/appStoreVersions", {
+              "filter[platform]" => "MAC_OS",
+              "limit" => "200"
+            })
+            rows = client.list(path).map do |item|
+              attrs = item.fetch("attributes")
+              {
+                "version" => attrs["versionString"],
+                "state" => attrs["appStoreState"],
+                "created_at" => attrs["createdDate"]
+              }
+            end
+            puts JSON.generate(rows)
+          '
