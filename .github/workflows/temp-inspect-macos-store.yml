@@ -48,10 +48,14 @@ jobs:
             })
             rows = client.list(path).map do |item|
               attrs = item.fetch("attributes")
+              locales = client.list(
+                "/v1/appStoreVersions/#{item.fetch("id")}/appStoreVersionLocalizations?limit=200"
+              ).map { |entry| entry.dig("attributes", "locale") }.compact.sort
               {
                 "version" => attrs["versionString"],
                 "state" => attrs["appStoreState"],
-                "created_at" => attrs["createdDate"]
+                "created_at" => attrs["createdDate"],
+                "locales" => locales
               }
             end
             puts JSON.generate(rows)
