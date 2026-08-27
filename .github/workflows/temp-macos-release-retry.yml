@@ -1,0 +1,144 @@
+name: temp-macos-release-retry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: temp-macos-release-retry
+  cancel-in-progress: false
+
+jobs:
+  framework:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      B3: ${{ secrets.B3 }}
+      P0: release
+    steps:
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          key_dir="$RUNNER_TEMP/k"
+          cleanup_key() { find "$key_dir" -depth -delete 2>/dev/null || true; }
+          trap cleanup_key EXIT
+          install -m 700 -d "$key_dir"
+          printf '%s\n' "$P2" > "$key_dir/i"
+          chmod 600 "$key_dir/i"
+          ssh-keyscan github.com > "$key_dir/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $key_dir/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$key_dir/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+      - uses: actions/download-artifact@v8
+        with:
+          name: x
+          path: ${{ runner.temp }}/i
+          github-token: ${{ github.token }}
+          run-id: 33031273517
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-b.sh
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: y
+          path: ${{ runner.temp }}/o/y.bin
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e-b
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
+
+  macos:
+    needs: framework
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      B3: ${{ secrets.B3 }}
+      P0: release
+      Q2: ${{ secrets.Q2 }}
+      Q3: ${{ secrets.Q3 }}
+      A0: ${{ secrets.A0 }}
+      A1: ${{ secrets.A1 }}
+      A2: ${{ secrets.A2 }}
+      A3: ${{ secrets.A3 }}
+      A4: ${{ secrets.A4 }}
+      A5: ${{ secrets.A5 }}
+      A6: ${{ secrets.A6 }}
+      A7: ${{ secrets.A7 }}
+      A8: ${{ secrets.A8 }}
+      A11: ${{ secrets.A11 }}
+      A14: ${{ secrets.A14 }}
+      A15: ${{ secrets.A15 }}
+      W0: ${{ secrets.W0 }}
+      W1: ${{ secrets.W1 }}
+      T1: "false"
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.24.13
+          cache: false
+      - name: prepare
+        env:
+          P1: ${{ secrets.P1 }}
+          P2: ${{ secrets.P2 }}
+          P3: ${{ secrets.P3 }}
+        run: |
+          key_dir="$RUNNER_TEMP/k"
+          cleanup_key() { find "$key_dir" -depth -delete 2>/dev/null || true; }
+          trap cleanup_key EXIT
+          install -m 700 -d "$key_dir"
+          printf '%s\n' "$P2" > "$key_dir/i"
+          chmod 600 "$key_dir/i"
+          ssh-keyscan github.com > "$key_dir/h" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $key_dir/i -o IdentitiesOnly=yes -o UserKnownHostsFile=$key_dir/h"
+          git clone --quiet "$P1" "$RUNNER_TEMP/p"
+          git -C "$RUNNER_TEMP/p" checkout --quiet --detach "$P3"
+      - uses: actions/download-artifact@v8
+        with:
+          name: y
+          path: ${{ runner.temp }}/i
+      - name: execute
+        run: cd "$RUNNER_TEMP/p" && ./run-m.sh
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e-m
+          path: ${{ runner.temp }}/o/e.bin
+          retention-days: 1
+          if-no-files-found: ignore
+
+  cleanup:
+    needs:
+      - framework
+      - macos
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: delete transient framework artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t artifact_ids < <(
+            gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+              --jq '.artifacts[] | select(.name == "y") | .id'
+          )
+          [[ "${#artifact_ids[@]}" -le 1 ]]
+          for artifact_id in "${artifact_ids[@]}"; do
+            gh api --silent --method DELETE \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+          done
